@@ -34,7 +34,7 @@ const LEVELS = [
 ] as const;
 
 type LevelId = (typeof LEVELS)[number]["id"];
-type Card = { id: number; name: string; image?: string; icon?: string };
+type Card = { id: number; name: string; image?: string | undefined; icon?: string | undefined };
 type Best = { moves: number; seconds: number };
 
 const STORAGE_KEY = "bible-memory-match-best";

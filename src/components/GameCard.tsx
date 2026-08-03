@@ -1,7 +1,7 @@
 interface GameCardProps {
   name: string;
-  image?: string;
-  icon?: string;
+  image?: string | undefined;
+  icon?: string | undefined;
   flipped: boolean;
   matched: boolean;
   onClick: () => void;

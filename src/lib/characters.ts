@@ -9,8 +9,8 @@ import samson from "@/assets/characters/samson.png";
 
 export type Character = {
   name: string;
-  image?: string;
-  icon?: string;
+  image?: string | undefined;
+  icon?: string | undefined;
   fact: string;
 };
 
