@@ -92,7 +92,7 @@ function Index() {
   const { play, muted, toggleMuted } = useSounds();
   const won = deck.length > 0 && matched.length === level.pairs;
   const best = bests[levelId];
-  const progress = level.pairs === 0 ? 0 : Math.round((matched.length / level.pairs) * 100);
+  const progress = Math.round((matched.length / level.pairs) * 100);
 
   useEffect(() => {
     setBests(loadBests());
