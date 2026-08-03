@@ -19,6 +19,10 @@
  */
 
 @theme inline {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -62,26 +66,32 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 1rem;
+  --background: oklch(0.972 0.019 88);
+  --foreground: oklch(0.31 0.035 58);
+  --card: oklch(0.993 0.008 90);
+  --card-foreground: oklch(0.31 0.035 58);
+  --popover: oklch(0.993 0.008 90);
+  --popover-foreground: oklch(0.31 0.035 58);
+  --primary: oklch(0.52 0.076 185);
+  --primary-foreground: oklch(0.985 0.012 90);
+  --secondary: oklch(0.93 0.03 88);
+  --secondary-foreground: oklch(0.36 0.04 58);
+  --muted: oklch(0.94 0.024 88);
+  --muted-foreground: oklch(0.53 0.03 62);
+  --accent: oklch(0.9 0.055 75);
+  --accent-foreground: oklch(0.34 0.05 55);
+  --destructive: oklch(0.577 0.18 27.325);
+  --destructive-foreground: oklch(0.985 0.012 90);
+  --border: oklch(0.89 0.028 82);
+  --input: oklch(0.89 0.028 82);
+  --ring: oklch(0.52 0.076 185);
+  --gold: oklch(0.78 0.12 78);
+  --gold-foreground: oklch(0.3 0.05 55);
+  --gradient-warm: linear-gradient(160deg, oklch(0.98 0.024 92), oklch(0.94 0.036 78));
+  --gradient-card-back: linear-gradient(150deg, oklch(0.58 0.075 185), oklch(0.44 0.07 195));
+  --shadow-card: 0 6px 16px -6px oklch(0.4 0.05 60 / 0.35);
+  --shadow-soft: 0 18px 40px -22px oklch(0.4 0.05 60 / 0.45);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -141,4 +151,71 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+@layer base {
+  body {
+    background-image: var(--gradient-warm);
+    background-attachment: fixed;
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+}
+
+@utility card-scene {
+  perspective: 900px;
+  background: transparent;
+}
+
+@utility card-inner {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 480ms cubic-bezier(0.34, 1.4, 0.5, 1);
+  &.is-flipped {
+    transform: rotateY(180deg);
+  }
+}
+
+@utility card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  backface-visibility: hidden;
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+@utility card-back {
+  background-image: var(--gradient-card-back);
+  color: var(--color-primary-foreground);
+  border: 1px solid oklch(1 0 0 / 0.18);
+}
+
+@utility card-front {
+  transform: rotateY(180deg);
+  background-color: var(--color-card);
+  color: var(--color-card-foreground);
+  border: 1px solid var(--color-border);
+  &.is-matched {
+    background-color: var(--color-accent);
+    border-color: var(--color-gold);
+    box-shadow: 0 0 0 2px var(--color-gold) inset, var(--shadow-card);
+  }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.9) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@utility animate-pop-in {
+  animation: pop-in 0.35s cubic-bezier(0.34, 1.3, 0.5, 1) both;
 }
