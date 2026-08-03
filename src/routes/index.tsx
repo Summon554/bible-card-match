@@ -64,7 +64,9 @@ function buildDeck(pairs: number): Card[] {
   ]);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
+    const tmp = deck[i]!;
+    deck[i] = deck[j]!;
+    deck[j] = tmp;
   }
   return deck;
 }
