@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Volume2, VolumeX } from "lucide-react";
 import { GameCard } from "@/components/GameCard";
+import { CHARACTERS, FACTS } from "@/lib/characters";
+import { useSounds } from "@/hooks/use-sounds";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -9,13 +12,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Flip and match pairs of Bible characters in this friendly memory game. Track moves and time across 4x4, 6x4 and 6x6 grids.",
+          "Flip and match illustrated Bible characters, learn a fun fact with every pair, and beat your best moves and time across three grid sizes.",
       },
       { property: "og:title", content: "Bible Memory Match — Card Matching Game" },
       {
         property: "og:description",
         content:
-          "A soft, friendly memory match game featuring Moses, Noah, David and more. Beat your best time.",
+          "A friendly memory match game with illustrated Bible characters, fun facts, sounds and best-score tracking.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -24,29 +27,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Character = { name: string; icon: string };
-
-const CHARACTERS: Character[] = [
-  { name: "Moses", icon: "📜" },
-  { name: "Noah", icon: "🛶" },
-  { name: "David", icon: "🎯" },
-  { name: "Abraham", icon: "⭐" },
-  { name: "Joseph", icon: "🧥" },
-  { name: "Daniel", icon: "🦁" },
-  { name: "Esther", icon: "👑" },
-  { name: "Samson", icon: "💪" },
-  { name: "Ruth", icon: "🌾" },
-  { name: "Solomon", icon: "🏛️" },
-  { name: "Elijah", icon: "🔥" },
-  { name: "Deborah", icon: "🌳" },
-  { name: "Jonah", icon: "🐋" },
-  { name: "Joshua", icon: "📯" },
-  { name: "Sarah", icon: "🌸" },
-  { name: "Miriam", icon: "🥁" },
-  { name: "Isaiah", icon: "🕊️" },
-  { name: "Rebekah", icon: "🏺" },
-];
-
 const LEVELS = [
   { id: "4x4", label: "4 × 4", pairs: 8, cols: "grid-cols-4" },
   { id: "6x4", label: "6 × 4", pairs: 12, cols: "grid-cols-4 sm:grid-cols-6" },
@@ -54,13 +34,26 @@ const LEVELS = [
 ] as const;
 
 type LevelId = (typeof LEVELS)[number]["id"];
+type Card = { id: number; name: string; image?: string; icon?: string };
+type Best = { moves: number; seconds: number };
 
-type Card = { id: number; name: string; icon: string };
+const STORAGE_KEY = "bible-memory-match-best";
+
+function loadBests(): Partial<Record<LevelId, Best>> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as Partial<
+      Record<LevelId, Best>
+    >;
+  } catch {
+    return {};
+  }
+}
 
 function buildDeck(pairs: number): Card[] {
   const deck = CHARACTERS.slice(0, pairs).flatMap((c, i) => [
-    { id: i * 2, name: c.name, icon: c.icon },
-    { id: i * 2 + 1, name: c.name, icon: c.icon },
+    { id: i * 2, name: c.name, image: c.image, icon: c.icon },
+    { id: i * 2 + 1, name: c.name, image: c.image, icon: c.icon },
   ]);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -87,20 +80,26 @@ function Index() {
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [started, setStarted] = useState(false);
+  const [fact, setFact] = useState<{ text: string; key: number } | null>(null);
+  const [bests, setBests] = useState<Partial<Record<LevelId, Best>>>({});
+  const [beatRecord, setBeatRecord] = useState(false);
 
+  const { play, muted, toggleMuted } = useSounds();
   const won = deck.length > 0 && matched.length === level.pairs;
+  const best = bests[levelId];
 
-  const newGame = useCallback(
-    (pairs: number) => {
-      setDeck(buildDeck(pairs));
-      setFlipped([]);
-      setMatched([]);
-      setMoves(0);
-      setSeconds(0);
-      setStarted(false);
-    },
-    [],
-  );
+  useEffect(() => setBests(loadBests()), []);
+
+  const newGame = useCallback((pairs: number) => {
+    setDeck(buildDeck(pairs));
+    setFlipped([]);
+    setMatched([]);
+    setMoves(0);
+    setSeconds(0);
+    setStarted(false);
+    setFact(null);
+    setBeatRecord(false);
+  }, []);
 
   useEffect(() => {
     newGame(level.pairs);
@@ -112,23 +111,59 @@ function Index() {
     return () => clearInterval(t);
   }, [started, won]);
 
+  // Reveal comparison for the current pair of flipped cards.
   useEffect(() => {
     if (flipped.length !== 2) return;
-    const [a, b] = flipped.map((id) => deck.find((c) => c.id === id)!);
+    const [a, b] = flipped.map((id) => deck.find((c) => c.id === id));
     if (a && b && a.name === b.name) {
       setMatched((m) => [...m, a.name]);
       setFlipped([]);
+      setFact({ text: FACTS[a.name] ?? "", key: Date.now() });
+      play("match");
       return;
     }
     const t = setTimeout(() => setFlipped([]), 1000);
     return () => clearTimeout(t);
-  }, [flipped, deck]);
+  }, [flipped, deck, play]);
+
+  useEffect(() => {
+    if (!fact) return;
+    const t = setTimeout(() => setFact(null), 2000);
+    return () => clearTimeout(t);
+  }, [fact]);
+
+  // Persist a new best score for this difficulty when the board is cleared.
+  useEffect(() => {
+    if (!won) return;
+    play("win");
+    setBests((prev) => {
+      const current = prev[levelId];
+      const improved =
+        !current || moves < current.moves || seconds < current.seconds;
+      if (!improved) return prev;
+      const next = {
+        ...prev,
+        [levelId]: {
+          moves: Math.min(moves, current?.moves ?? moves),
+          seconds: Math.min(seconds, current?.seconds ?? seconds),
+        },
+      };
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
+      setBeatRecord(true);
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [won]);
 
   const handleFlip = (card: Card) => {
-    if (won) return;
-    if (flipped.length === 2) return;
+    if (won || flipped.length === 2) return;
     if (flipped.includes(card.id) || matched.includes(card.name)) return;
     if (!started) setStarted(true);
+    play("flip");
     const next = [...flipped, card.id];
     setFlipped(next);
     if (next.length === 2) setMoves((m) => m + 1);
@@ -141,7 +176,15 @@ function Index() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-12">
-      <header className="text-center">
+      <header className="relative text-center">
+        <button
+          type="button"
+          onClick={toggleMuted}
+          aria-label={muted ? "Unmute sounds" : "Mute sounds"}
+          className="absolute right-0 top-0 rounded-full border border-border bg-card p-2 text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+        </button>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
           Match the pairs
         </p>
@@ -170,21 +213,28 @@ function Index() {
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-border bg-card/70 p-3 text-center shadow-[var(--shadow-card)]">
-        {[
-          { label: "Moves", value: String(moves) },
-          { label: "Time", value: formatTime(seconds) },
-          { label: "Pairs", value: `${matched.length}/${level.pairs}` },
-        ].map((stat) => (
-          <div key={stat.label}>
-            <div className="font-display text-xl font-semibold text-foreground sm:text-2xl">
-              {stat.value}
+      <div className="mt-5 rounded-2xl border border-border bg-card/70 p-3 shadow-[var(--shadow-card)]">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          {[
+            { label: "Moves", value: String(moves) },
+            { label: "Time", value: formatTime(seconds) },
+            { label: "Pairs", value: `${matched.length}/${level.pairs}` },
+          ].map((stat) => (
+            <div key={stat.label}>
+              <div className="font-display text-xl font-semibold text-foreground sm:text-2xl">
+                {stat.value}
+              </div>
+              <div className="text-[0.65rem] uppercase tracking-widest text-muted-foreground">
+                {stat.label}
+              </div>
             </div>
-            <div className="text-[0.65rem] uppercase tracking-widest text-muted-foreground">
-              {stat.label}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <p className="mt-2 border-t border-border pt-2 text-center text-xs font-semibold text-primary">
+          {best
+            ? `Best: ${best.moves} moves / ${formatTime(best.seconds)} — ${level.label}`
+            : `No best score yet for ${level.label}`}
+        </p>
       </div>
 
       <section className="relative mt-5">
@@ -193,6 +243,7 @@ function Index() {
             <GameCard
               key={card.id}
               name={card.name}
+              image={card.image}
               icon={card.icon}
               flipped={flipped.includes(card.id)}
               matched={matched.includes(card.name)}
@@ -200,6 +251,16 @@ function Index() {
             />
           ))}
         </div>
+
+        {fact && !won && (
+          <div
+            key={fact.key}
+            role="status"
+            className="animate-fact pointer-events-none absolute bottom-3 left-1/2 z-20 w-[min(20rem,92%)] -translate-x-1/2 rounded-2xl border border-gold bg-card px-4 py-3 text-center text-xs font-semibold leading-snug text-foreground shadow-[var(--shadow-soft)]"
+          >
+            {fact.text}
+          </div>
+        )}
 
         {won && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-background/85 backdrop-blur-sm">
@@ -209,7 +270,7 @@ function Index() {
               </div>
               <h2 className="mt-2 text-3xl font-semibold text-foreground">You Win!</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                All {level.pairs} pairs found.
+                {beatRecord ? "New best score!" : `All ${level.pairs} pairs found.`}
               </p>
               <dl className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-secondary p-3 text-center">
                 <div>
@@ -231,6 +292,11 @@ function Index() {
                   </dt>
                 </div>
               </dl>
+              {best && (
+                <p className="mt-3 text-xs font-semibold text-primary">
+                  Best: {best.moves} moves / {formatTime(best.seconds)}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => newGame(level.pairs)}
