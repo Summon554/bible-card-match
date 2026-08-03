@@ -1,12 +1,13 @@
 interface GameCardProps {
   name: string;
-  icon: string;
+  image?: string | undefined;
+  icon?: string | undefined;
   flipped: boolean;
   matched: boolean;
   onClick: () => void;
 }
 
-export function GameCard({ name, icon, flipped, matched, onClick }: GameCardProps) {
+export function GameCard({ name, image, icon, flipped, matched, onClick }: GameCardProps) {
   const faceUp = flipped || matched;
 
   return (
@@ -21,12 +22,25 @@ export function GameCard({ name, icon, flipped, matched, onClick }: GameCardProp
           <span className="text-xl opacity-70 sm:text-2xl">✦</span>
         </div>
         <div className={`card-face card-front ${matched ? "is-matched" : ""}`}>
-          <span className="text-2xl leading-none sm:text-3xl" aria-hidden="true">
-            {icon}
-          </span>
-          <span className="mt-1 px-0.5 text-[0.6rem] font-semibold leading-tight sm:text-xs">
-            {name}
-          </span>
+          <div className={`flex h-full w-full flex-col items-center justify-center overflow-hidden px-0.5 pb-1 pt-1 ${faceUp ? "animate-reveal-pop" : ""}`}>
+            {image ? (
+              <img
+                src={image}
+                alt={name}
+                loading="lazy"
+                width={512}
+                height={640}
+                className="min-h-0 w-full flex-1 object-contain"
+              />
+            ) : (
+              <span className="flex flex-1 items-center text-2xl leading-none sm:text-3xl" aria-hidden="true">
+                {icon}
+              </span>
+            )}
+            <span className="mt-0.5 shrink-0 px-0.5 text-[0.55rem] font-semibold leading-tight sm:text-[0.7rem]">
+              {name}
+            </span>
+          </div>
         </div>
       </div>
     </button>

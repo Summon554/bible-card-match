@@ -219,3 +219,27 @@
 @utility animate-pop-in {
   animation: pop-in 0.35s cubic-bezier(0.34, 1.3, 0.5, 1) both;
 }
+
+@keyframes reveal-pop {
+  0% { transform: scale(0.72); opacity: 0.3; }
+  55% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@utility animate-reveal-pop {
+  animation: reveal-pop 0.5s cubic-bezier(0.34, 1.5, 0.5, 1) both;
+  animation-delay: 0.2s;
+}
+
+@keyframes fact-in {
+  0% { opacity: 0; transform: translateY(10px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@utility animate-fact {
+  animation: fact-in 0.28s ease-out both, fade-out-soft 0.45s ease-in 1.55s both;
+}
+
+@keyframes fade-out-soft {
+  to { opacity: 0; transform: translateY(-6px); }
+}
