@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Volume2, VolumeX } from "lucide-react";
+import { Lock, Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import { GameCard } from "@/components/GameCard";
+import { Confetti } from "@/components/Confetti";
 import { CHARACTERS, FACTS } from "@/lib/characters";
 import { useSounds } from "@/hooks/use-sounds";
 
@@ -12,13 +13,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Flip and match illustrated Bible characters, learn a fun fact with every pair, and beat your best moves and time across three grid sizes.",
+          "Flip and match illustrated Bible characters, learn a fun fact and verse with every pair, and beat your best moves and time across three grid sizes.",
       },
       { property: "og:title", content: "Bible Memory Match — Card Matching Game" },
       {
         property: "og:description",
         content:
-          "A friendly memory match game with illustrated Bible characters, fun facts, sounds and best-score tracking.",
+          "A friendly memory match game with illustrated Bible characters, scripture facts, sounds, dark mode and best-score tracking.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -38,6 +39,8 @@ type Card = { id: number; name: string; image?: string | undefined; icon?: strin
 type Best = { moves: number; seconds: number };
 
 const STORAGE_KEY = "bible-memory-match-best";
+const UNLOCK_KEY = "bible-memory-match-unlocked";
+const THEME_KEY = "bible-memory-match-theme";
 
 function loadBests(): Partial<Record<LevelId, Best>> {
   if (typeof window === "undefined") return {};
@@ -80,15 +83,39 @@ function Index() {
   const [moves, setMoves] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [started, setStarted] = useState(false);
-  const [fact, setFact] = useState<{ text: string; key: number } | null>(null);
+  const [fact, setFact] = useState<{ text: string; verse: string; key: number } | null>(null);
   const [bests, setBests] = useState<Partial<Record<LevelId, Best>>>({});
   const [beatRecord, setBeatRecord] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [dark, setDark] = useState(false);
 
   const { play, muted, toggleMuted } = useSounds();
   const won = deck.length > 0 && matched.length === level.pairs;
   const best = bests[levelId];
+  const progress = Math.round((matched.length / level.pairs) * 100);
 
-  useEffect(() => setBests(loadBests()), []);
+  useEffect(() => {
+    setBests(loadBests());
+    try {
+      setUnlocked(window.localStorage.getItem(UNLOCK_KEY) === "true");
+      const stored = window.localStorage.getItem(THEME_KEY);
+      const prefersDark =
+        stored === null && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      setDark(stored === "dark" || prefersDark);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  // Apply the theme class to <html> so all tokens switch at once.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    try {
+      window.localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
+    } catch {
+      /* storage unavailable */
+    }
+  }, [dark]);
 
   const newGame = useCallback((pairs: number) => {
     setDeck(buildDeck(pairs));
@@ -116,9 +143,10 @@ function Index() {
     if (flipped.length !== 2) return;
     const [a, b] = flipped.map((id) => deck.find((c) => c.id === id));
     if (a && b && a.name === b.name) {
+      const info = FACTS[a.name];
       setMatched((m) => [...m, a.name]);
       setFlipped([]);
-      setFact({ text: FACTS[a.name] ?? "", key: Date.now() });
+      setFact({ text: info?.fact ?? "", verse: info?.verse ?? "", key: Date.now() });
       play("match");
       return;
     }
@@ -136,10 +164,17 @@ function Index() {
   useEffect(() => {
     if (!won) return;
     play("win");
+    if (levelId === "4x4") {
+      setUnlocked(true);
+      try {
+        window.localStorage.setItem(UNLOCK_KEY, "true");
+      } catch {
+        /* storage unavailable */
+      }
+    }
     setBests((prev) => {
       const current = prev[levelId];
-      const improved =
-        !current || moves < current.moves || seconds < current.seconds;
+      const improved = !current || moves < current.moves || seconds < current.seconds;
       if (!improved) return prev;
       const next = {
         ...prev,
@@ -177,14 +212,24 @@ function Index() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-12">
       <header className="relative text-center">
-        <button
-          type="button"
-          onClick={toggleMuted}
-          aria-label={muted ? "Unmute sounds" : "Mute sounds"}
-          className="absolute right-0 top-0 rounded-full border border-border bg-card p-2 text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </button>
+        <div className="absolute right-0 top-0 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setDark((d) => !d)}
+            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+            className="rounded-full border border-border bg-card p-2 text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={toggleMuted}
+            aria-label={muted ? "Unmute sounds" : "Mute sounds"}
+            className="rounded-full border border-border bg-card p-2 text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
+        </div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
           Match the pairs
         </p>
@@ -197,21 +242,35 @@ function Index() {
       </header>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        {LEVELS.map((l) => (
-          <button
-            key={l.id}
-            type="button"
-            onClick={() => setLevelId(l.id)}
-            className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${
-              l.id === levelId
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card text-muted-foreground hover:bg-secondary"
-            }`}
-          >
-            {l.label}
-          </button>
-        ))}
+        {LEVELS.map((l) => {
+          const locked = l.id !== "4x4" && !unlocked;
+          return (
+            <button
+              key={l.id}
+              type="button"
+              disabled={locked}
+              onClick={() => setLevelId(l.id)}
+              title={locked ? "Complete the 4 × 4 level to unlock" : undefined}
+              aria-label={locked ? `${l.label} — locked, complete 4 × 4 to unlock` : l.label}
+              className={`flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${
+                l.id === levelId
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : locked
+                    ? "cursor-not-allowed border-border bg-muted text-muted-foreground/60"
+                    : "border-border bg-card text-muted-foreground hover:bg-secondary"
+              }`}
+            >
+              {locked && <Lock className="h-3 w-3" />}
+              {l.label}
+            </button>
+          );
+        })}
       </div>
+      {!unlocked && (
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Finish a 4 × 4 game to unlock the bigger grids.
+        </p>
+      )}
 
       <div className="mt-5 rounded-2xl border border-border bg-card/70 p-3 shadow-[var(--shadow-card)]">
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -230,6 +289,26 @@ function Index() {
             </div>
           ))}
         </div>
+
+        <div className="mt-3">
+          <div
+            role="progressbar"
+            aria-label="Pairs found"
+            aria-valuemin={0}
+            aria-valuemax={level.pairs}
+            aria-valuenow={matched.length}
+            className="h-2.5 w-full overflow-hidden rounded-full bg-secondary"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-1 text-center text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
+            {progress}% complete
+          </p>
+        </div>
+
         <p className="mt-2 border-t border-border pt-2 text-center text-xs font-semibold text-primary">
           {best
             ? `Best: ${best.moves} moves / ${formatTime(best.seconds)} — ${level.label}`
@@ -259,12 +338,18 @@ function Index() {
             className="animate-fact pointer-events-none absolute bottom-3 left-1/2 z-20 w-[min(20rem,92%)] -translate-x-1/2 rounded-2xl border border-gold bg-card px-4 py-3 text-center text-xs font-semibold leading-snug text-foreground shadow-[var(--shadow-soft)]"
           >
             {fact.text}
+            {fact.verse && (
+              <span className="mt-1 block text-[0.65rem] font-semibold uppercase tracking-widest text-primary">
+                {fact.verse}
+              </span>
+            )}
           </div>
         )}
 
         {won && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-background/85 backdrop-blur-sm">
-            <div className="animate-pop-in w-full max-w-xs rounded-3xl border border-gold bg-card p-6 text-center shadow-[var(--shadow-soft)]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center overflow-hidden rounded-2xl bg-background/85 backdrop-blur-sm">
+            <Confetti />
+            <div className="animate-pop-in relative z-40 w-full max-w-xs rounded-3xl border border-gold bg-card p-6 text-center shadow-[var(--shadow-soft)]">
               <div className="text-4xl" aria-hidden="true">
                 🎉
               </div>
