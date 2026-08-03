@@ -250,3 +250,21 @@
 @keyframes fade-out-soft {
   to { opacity: 0; transform: translateY(-6px); }
 }
+
+@keyframes confetti-fall {
+  0% { opacity: 0; transform: translate3d(0, -12%, 0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--confetti-drift, 0px), 115%, 0) rotate(720deg); }
+}
+
+.confetti-bit {
+  position: absolute;
+  top: -8%;
+  animation-name: confetti-fall;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.5, 1);
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-bit { animation: none; opacity: 0; }
+}
