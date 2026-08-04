@@ -17,7 +17,7 @@ export default defineConfig({
     plugins: [
       VitePWA({
         strategies: "generateSW",
-        registerType: "autoUpdate",
+        registerType: "prompt",
         injectRegister: null,
         filename: "sw.js",
         outDir: "dist/client",
@@ -51,7 +51,7 @@ export default defineConfig({
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
-          skipWaiting: true,
+          skipWaiting: false,
           runtimeCaching: [
             {
               urlPattern: ({ request, sameOrigin }) =>
