@@ -5,13 +5,21 @@ import { applyServiceWorkerUpdate, registerServiceWorker } from "../lib/register
 const AUTO_REFRESH_KEY = "bible-memory-match-pwa-auto-refresh";
 const AUTO_REFRESH_COUNTDOWN = 3;
 
+interface VersionInfo {
+  version: string;
+  releaseDate: string;
+}
+
 export function PwaUpdatePrompt() {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [newVersion, setNewVersion] = useState<VersionInfo | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<number | null>(null);
+
+  const currentVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "";
 
   useEffect(() => {
     try {
@@ -26,6 +34,30 @@ export function PwaUpdatePrompt() {
   useEffect(() => {
     registerServiceWorker((sw) => setWaiting(sw));
   }, []);
+
+  useEffect(() => {
+    if (!waiting) {
+      setNewVersion(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/public/version", { cache: "no-store" })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to fetch version");
+        return (await res.json()) as VersionInfo;
+      })
+      .then((info) => {
+        if (!cancelled) setNewVersion(info);
+      })
+      .catch(() => {
+        /* leave version info empty if the request fails */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [waiting]);
 
   useEffect(() => {
     if (!waiting || refreshing || !autoRefresh) {
@@ -85,6 +117,16 @@ export function PwaUpdatePrompt() {
     setCountdown(null);
   };
 
+  const versionLabel = newVersion ? (
+    <p className="text-xs text-muted-foreground">
+      Current: <span className="font-medium text-foreground">{currentVersion}</span> {" "}
+      → New: <span className="font-medium text-foreground">{newVersion.version}</span>
+      {" "}({newVersion.releaseDate})
+    </p>
+  ) : (
+    <p className="text-xs text-muted-foreground">Current: {currentVersion}</p>
+  );
+
   if (!waiting) return null;
 
   if (autoRefresh && countdown !== null) {
@@ -99,6 +141,7 @@ export function PwaUpdatePrompt() {
             <p className="font-display text-sm font-semibold text-foreground">
               New version available
             </p>
+            {versionLabel}
             <p className="mt-1 text-xs text-muted-foreground">
               Auto-refreshing in {countdown} second{countdown !== 1 ? "s" : ""}…
             </p>
@@ -120,7 +163,9 @@ export function PwaUpdatePrompt() {
       <div className="fixed bottom-4 left-4 z-50 max-w-xs rounded-2xl border border-border bg-card p-4 shadow-lg animate-pop-in">
         <div className="flex items-center gap-3">
           <RefreshCw className="size-5 animate-spin text-primary" aria-hidden="true" />
-          <p className="font-display text-sm font-semibold text-foreground">Refreshing…</p>
+          <p className="font-display text-sm font-semibold text-foreground">
+            Updating to {newVersion?.version ?? "new version"}…
+          </p>
         </div>
       </div>
     );
@@ -134,6 +179,7 @@ export function PwaUpdatePrompt() {
           <p className="font-display text-sm font-semibold text-foreground">
             New version available
           </p>
+          {versionLabel}
           <p className="mt-1 text-xs text-muted-foreground">
             Refresh to load the latest game files.
           </p>
