@@ -4,8 +4,15 @@
 //     nitro (build-only using cloudflare as a default target), VITE_* env injection, @ path alias,
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+import { readFileSync } from "fs";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
+
+const packageJson = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf-8"),
+);
+const appVersion = packageJson.version ?? "0.0.0";
+const appReleaseDate = new Date().toISOString().split("T")[0];
 
 export default defineConfig({
   tanstackStart: {
@@ -14,6 +21,10 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+      __APP_RELEASE_DATE__: JSON.stringify(appReleaseDate),
+    },
     plugins: [
       VitePWA({
         strategies: "generateSW",
