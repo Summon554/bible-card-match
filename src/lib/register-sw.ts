@@ -42,6 +42,21 @@ async function unregisterAppServiceWorkers() {
   );
 }
 
+/**
+ * Stores the home page HTML in the navigation cache so a cold offline launch
+ * always has a document to render (the app is server-rendered, so there is no
+ * precached index.html).
+ */
+async function warmNavigationCache() {
+  try {
+    const cache = await caches.open("html-navigations");
+    const response = await fetch("/", { cache: "reload" });
+    if (response.ok) await cache.put("/", response.clone());
+  } catch {
+    /* best-effort warm-up */
+  }
+}
+
 /** Registers the offline service worker outside dev/preview contexts only. */
 export function registerServiceWorker(
   onUpdateReady?: (waiting: ServiceWorker) => void,
@@ -56,7 +71,10 @@ export function registerServiceWorker(
   void navigator.serviceWorker
     .register(SW_URL, { scope: "/" })
     .then((registration) => {
+      void warmNavigationCache();
+
       if (!onUpdateReady) return;
+
 
       const notifyIfWaiting = () => {
         if (registration.waiting && navigator.serviceWorker.controller) {

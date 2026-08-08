@@ -58,15 +58,20 @@ export default defineConfig({
         workbox: {
           globPatterns: ["**/*.{js,css,html,png,jpg,jpeg,svg,webp,woff,woff2,ico,webmanifest}"],
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
-          navigateFallback: "/",
-          navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
+          // This app is server-rendered: there is no static index.html to use as a
+          // navigateFallback (the plugin defaults to one), so page loads are handled
+          // by the NetworkFirst rule below instead.
+          navigateFallback: null,
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: false,
           runtimeCaching: [
             {
-              urlPattern: ({ request, sameOrigin }) =>
-                sameOrigin && request.mode === "navigate",
+              urlPattern: ({ request, sameOrigin, url }) =>
+                sameOrigin &&
+                request.mode === "navigate" &&
+                !url.pathname.startsWith("/~oauth") &&
+                !url.pathname.startsWith("/api/"),
               handler: "NetworkFirst",
               options: { cacheName: "html-navigations", networkTimeoutSeconds: 5 },
             },
