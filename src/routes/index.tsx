@@ -1,10 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Lock, Moon, Sun, Volume2, VolumeX } from "lucide-react";
+import { Lock, Moon, Palette, Sun, Volume2, VolumeX } from "lucide-react";
 import { GameCard } from "@/components/GameCard";
 import { Confetti } from "@/components/Confetti";
 import { CHARACTERS, FACTS } from "@/lib/characters";
 import { useSounds } from "@/hooks/use-sounds";
+import {
+  type LevelId,
+  type ThemeId,
+  THEMES,
+  applyThemeCSS,
+  clearThemeCSS,
+  loadLevelsWon,
+  loadThemeState,
+  saveLevelsWon,
+  saveThemeState,
+  themeUnlockForLevel,
+} from "@/lib/themes";
+
+const PUBLISHED_URL = "https://bible-card-match.lovable.app";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,19 +36,42 @@ export const Route = createFileRoute("/")({
           "A friendly memory match game with illustrated Bible characters, scripture facts, sounds, dark mode and best-score tracking.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: `${PUBLISHED_URL}/` },
+      { property: "og:image", content: `${PUBLISHED_URL}/og-image.png` },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: `${PUBLISHED_URL}/og-image.png` },
+    ],
+    links: [{ rel: "canonical", href: `${PUBLISHED_URL}/` }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "VideoGame",
+          name: "Bible Memory Match",
+          description:
+            "A friendly Bible-themed memory matching game with illustrated characters, scripture facts, and three difficulty levels.",
+          url: `${PUBLISHED_URL}/`,
+          image: `${PUBLISHED_URL}/og-image.png`,
+          applicationCategory: "Game",
+          operatingSystem: "Any",
+          author: {
+            "@type": "Organization",
+            name: "Lovable",
+          },
+        }),
+      },
     ],
   }),
   component: Index,
 });
 
 const LEVELS = [
-  { id: "4x4", label: "4 × 4", pairs: 8, cols: "grid-cols-4" },
-  { id: "6x4", label: "6 × 4", pairs: 12, cols: "grid-cols-4 sm:grid-cols-6" },
-  { id: "6x6", label: "6 × 6", pairs: 18, cols: "grid-cols-6" },
+  { id: "4x4" as LevelId, label: "4 × 4", pairs: 8, cols: "grid-cols-4" },
+  { id: "6x4" as LevelId, label: "6 × 4", pairs: 12, cols: "grid-cols-4 sm:grid-cols-6" },
+  { id: "6x6" as LevelId, label: "6 × 6", pairs: 18, cols: "grid-cols-6" },
 ] as const;
 
-type LevelId = (typeof LEVELS)[number]["id"];
 type Card = { id: number; name: string; image?: string | undefined; icon?: string | undefined };
 type Best = { moves: number; seconds: number };
 
@@ -88,14 +125,24 @@ function Index() {
   const [beatRecord, setBeatRecord] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [dark, setDark] = useState(false);
+  const [levelsWon, setLevelsWon] = useState<LevelId[]>([]);
+  const [themeState, setThemeState] = useState<{ unlocked: ThemeId[]; active: ThemeId }>({
+    unlocked: ["parchment"],
+    active: "parchment",
+  });
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const { play, muted, toggleMuted } = useSounds();
   const won = deck.length > 0 && matched.length === level.pairs;
   const best = bests[levelId];
   const progress = Math.round((matched.length / level.pairs) * 100);
+  const activeTheme = THEMES.find((t) => t.id === themeState.active)!;
 
   useEffect(() => {
     setBests(loadBests());
+    const won = loadLevelsWon();
+    setLevelsWon(won);
+    setThemeState(loadThemeState());
     try {
       setUnlocked(window.localStorage.getItem(UNLOCK_KEY) === "true");
       const stored = window.localStorage.getItem(THEME_KEY);
@@ -116,6 +163,12 @@ function Index() {
       /* storage unavailable */
     }
   }, [dark]);
+
+  // Apply the active theme colors to CSS variables.
+  useEffect(() => {
+    applyThemeCSS(activeTheme, dark);
+    return () => clearThemeCSS();
+  }, [activeTheme, dark]);
 
   const newGame = useCallback((pairs: number) => {
     setDeck(buildDeck(pairs));
@@ -172,6 +225,15 @@ function Index() {
         /* storage unavailable */
       }
     }
+
+    // Track wins per level for theme unlocks.
+    setLevelsWon((prev) => {
+      if (prev.includes(levelId)) return prev;
+      const next = [...prev, levelId];
+      saveLevelsWon(next);
+      return next;
+    });
+
     setBests((prev) => {
       const current = prev[levelId];
       const improved = !current || moves < current.moves || seconds < current.seconds;
@@ -194,6 +256,22 @@ function Index() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [won]);
 
+  // Update theme unlocks when levels won change.
+  useEffect(() => {
+    setThemeState((prev) => {
+      const unlockedSet = new Set<ThemeId>(["parchment"]);
+      for (const level of levelsWon) {
+        const themeId = themeUnlockForLevel(level);
+        if (themeId) unlockedSet.add(themeId);
+      }
+      const unlocked = Array.from(unlockedSet);
+      const active = unlocked.includes(prev.active) ? prev.active : "parchment";
+      const next = { unlocked, active };
+      saveThemeState(next);
+      return next;
+    });
+  }, [levelsWon]);
+
   const handleFlip = (card: Card) => {
     if (won || flipped.length === 2) return;
     if (flipped.includes(card.id) || matched.includes(card.name)) return;
@@ -209,10 +287,73 @@ function Index() {
     [moves, matched.length],
   );
 
+  const setActiveTheme = (id: ThemeId) => {
+    if (!themeState.unlocked.includes(id)) return;
+    setThemeState((prev) => {
+      const next = { ...prev, active: id };
+      saveThemeState(next);
+      return next;
+    });
+  };
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-8 sm:px-6 sm:py-12">
       <header className="relative text-center">
         <div className="absolute right-0 top-0 flex gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setThemeOpen((o) => !o)}
+              aria-label="Change theme"
+              aria-expanded={themeOpen}
+              className="rounded-full border border-border bg-card p-2 text-muted-foreground shadow-[var(--shadow-card)] transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              <Palette className="h-4 w-4" />
+            </button>
+            {themeOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-2xl border border-border bg-card p-2 shadow-[var(--shadow-soft)]">
+                <p className="px-2 py-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Themes
+                </p>
+                {THEMES.map((theme) => {
+                  const isLocked = !themeState.unlocked.includes(theme.id);
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => {
+                        setActiveTheme(theme.id);
+                        setThemeOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm transition-colors ${
+                        theme.id === themeState.active
+                          ? "bg-primary text-primary-foreground"
+                          : isLocked
+                            ? "text-muted-foreground/60"
+                            : "hover:bg-secondary"
+                      }`}
+                    >
+                      <span
+                        className="h-5 w-5 rounded-full border border-white/20 shadow-sm"
+                        style={{ background: theme.cardBackGradient }}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1">
+                        <span className="block font-semibold">{theme.label}</span>
+                        <span className="block text-[0.65rem] opacity-80">
+                          {isLocked
+                            ? `Win ${theme.unlockLevel} to unlock`
+                            : theme.description}
+                        </span>
+                      </span>
+                      {isLocked && <Lock className="h-3 w-3" aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setDark((d) => !d)}
