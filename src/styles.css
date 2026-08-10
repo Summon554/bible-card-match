@@ -267,4 +267,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .confetti-bit { animation: none; opacity: 0; }
+  .card-inner { transition: none; }
+  .animate-reveal-pop { animation: none; }
+  .animate-fact { animation: none; }
+  .animate-pop-in { animation: none; }
 }
+
