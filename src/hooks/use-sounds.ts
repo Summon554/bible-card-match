@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const MUTE_KEY = "bible-memory-match-muted";
 
 type Ctx = AudioContext | null;
 
@@ -27,6 +29,24 @@ export type SoundName = "flip" | "match" | "win";
 export function useSounds() {
   const [muted, setMuted] = useState(false);
   const ctxRef = useRef<Ctx>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setMuted(window.localStorage.getItem(MUTE_KEY) === "true");
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(MUTE_KEY, String(muted));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [muted]);
 
   const play = useCallback(
     (name: SoundName) => {
@@ -59,3 +79,4 @@ export function useSounds() {
 
   return { play, muted, toggleMuted: () => setMuted((m) => !m) };
 }
+

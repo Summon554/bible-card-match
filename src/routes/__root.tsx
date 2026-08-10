@@ -81,11 +81,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Bible Memory Match" },
+      {
+        name: "description",
+        content:
+          "A friendly Bible-themed memory matching game with illustrated characters, scripture facts, and three difficulty levels.",
+      },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Bible Memory Match" },
+      {
+        property: "og:description",
+        content:
+          "Flip and match illustrated Bible characters, learn a fun fact and verse with every pair, and beat your best score.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
@@ -95,6 +103,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "Bible Match" },
 
     ],
+
     links: [
       {
         rel: "stylesheet",
