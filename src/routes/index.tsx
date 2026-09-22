@@ -21,6 +21,7 @@ import {
 const PUBLISHED_URL = "https://bible-card-match.lovable.app";
 
 export const Route = createFileRoute("/")({
+  staticData: { sitemap: true },
   head: () => ({
     meta: [
       { title: "Bible Memory Match — Card Matching Game" },
