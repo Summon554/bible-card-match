@@ -42,6 +42,8 @@ export function PwaUpdatePrompt() {
     }
 
     let cancelled = false;
+    // Skip the lookup entirely when offline so nothing errors mid-game.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
     fetch("/api/public/version", { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("Failed to fetch version");
