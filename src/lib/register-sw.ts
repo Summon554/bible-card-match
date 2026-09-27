@@ -1,6 +1,7 @@
 const SW_URL = "/sw.js";
+export const OFFLINE_READY_EVENT = "bible-memory-match:offline-ready";
 
-function isBlockedContext(): boolean {
+export function isServiceWorkerRegistrationBlocked(): boolean {
   if (typeof window === "undefined") return true;
   if (!import.meta.env.PROD) return true;
 
@@ -47,13 +48,22 @@ async function unregisterAppServiceWorkers() {
  * always has a document to render (the app is server-rendered, so there is no
  * precached index.html).
  */
-async function warmNavigationCache() {
+async function warmNavigationCache(): Promise<boolean> {
   try {
     const cache = await caches.open("html-navigations");
     const response = await fetch("/", { cache: "reload" });
-    if (response.ok) await cache.put("/", response.clone());
+    if (response.ok) {
+      await cache.put("/", response.clone());
+      return true;
+    }
+    return Boolean(await cache.match("/"));
   } catch {
-    /* best-effort warm-up */
+    try {
+      const cache = await caches.open("html-navigations");
+      return Boolean(await cache.match("/"));
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -63,15 +73,17 @@ export function registerServiceWorker(
 ): void {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
-  if (isBlockedContext()) {
+  if (isServiceWorkerRegistrationBlocked()) {
     void unregisterAppServiceWorkers();
     return;
   }
 
   void navigator.serviceWorker
     .register(SW_URL, { scope: "/" })
-    .then((registration) => {
-      void warmNavigationCache();
+    .then(async (registration) => {
+      await navigator.serviceWorker.ready;
+      const navigationReady = await warmNavigationCache();
+      if (navigationReady) window.dispatchEvent(new Event(OFFLINE_READY_EVENT));
 
       if (!onUpdateReady) return;
 
