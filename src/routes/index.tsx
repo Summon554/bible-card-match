@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Lock, Moon, Palette, Sun, Volume2, VolumeX } from "lucide-react";
 import { GameCard } from "@/components/GameCard";
 import { Confetti } from "@/components/Confetti";
+import { OfflineStatus } from "@/components/OfflineStatus";
 import { CHARACTERS, FACTS } from "@/lib/characters";
 import { useSounds } from "@/hooks/use-sounds";
 import {
@@ -381,6 +382,7 @@ function Index() {
         <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
           Flip two cards at a time and find every pair of Bible characters.
         </p>
+        <OfflineStatus />
       </header>
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
